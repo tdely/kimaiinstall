@@ -2,11 +2,13 @@ kimaiinstall
 ============
 Automated installation of the Kimai time-tracking application, using Nginx and MySQL.
 The script has been tested and is set to install Kimai version 0.9.3-rc.1.
+
 Changing the Kimai version to install may be done by changing the `kimaiversion` parameter, be advised however that other Kimai versions have not been tested and may not be compatible with this script.
 
 Usage
 --------------
 Call the script with your prefered domain as a parameter: `bash kimaiinstall <domain>`.
+
 After the script has successfully finished, browse to the Kimai application and proceed with the installation through the Kimai installation wizard.
 
 Installation process
