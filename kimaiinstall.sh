@@ -1,15 +1,9 @@
 #!/bin/bash
 
-# General settings
 domain=$1
 kimaiversion="0.9.3-rc.1"
 webdir="/var/www"
 passlength=15
-
-# Nginx Settings
-workconn=512
-workproc=$( nproc )
-let workrlimit=${workproc}*${workconn}
 
 # Applications to install
 applist=( curl nginx php5-fpm php-apc mysql-server php5-mysqlnd )
@@ -51,7 +45,7 @@ apt-get update \
 echo "Installing required applications.."
 for item in "${applist[@]}"
 do
-    apt-get install "${item}" -y \
+    apt-get install ${item} -y \
       || { echo -e >&2 "apt-get \e[31mfailed\e[0m on ${item}"; exit 1; }
 done
 
@@ -120,13 +114,13 @@ echo_success
 status_message "Writing configuration to /etc/nginx.conf"
 ERROR=$(( echo "\
 user                        www-data;
-worker_processes            ${workproc};
+worker_processes            2;
 worker_priority             15;
-worker_rlimit_nofile        ${workrlimit};
+worker_rlimit_nofile        1024;
 pid                         /var/run/nginx.pid;
 
 events {
-  worker_connections        ${workconn};
+  worker_connections        512;
   accept_mutex              on;
   multi_accept              off;
 }
