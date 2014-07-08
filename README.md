@@ -3,7 +3,7 @@ kimaiinstall
 Debian-based automated installation of the Kimai time-tracking application, using Nginx and MySQL.
 The script has been tested and is set to install Kimai version 0.9.3-rc.1.
 
-Changing the Kimai version to install may be done by changing the `kimaiversion` parameter, be advised however that other Kimai versions have not been tested and may not be compatible with this script.
+Changing the Kimai version to install may be done by changing the `KIMAI_VERSION` parameter, be advised however that other Kimai versions have not been tested and may not be compatible with this script.
 
 Usage
 --------------
