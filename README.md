@@ -9,7 +9,7 @@ Usage
 --------------
 Call the script with your prefered domain as a parameter: `bash kimaiinstall <domain>`
 
-`Usage: kimaiinstall.sh [OPTIONS]... <DOMAIN NAME>
+Usage: kimaiinstall.sh [OPTIONS]... <DOMAIN NAME>
 Install Kimai and necessary supporting software.
 
   -c, --clean              remove downloaded archive after extraction
@@ -21,9 +21,7 @@ Install Kimai and necessary supporting software.
   -p, --passlength K       generate password K characters long for MySQL user
   -u, --user name          name of MySQL user to create for Kimai
   -v, --version            output version information and exit
-  -w, --webdir path        root directory path for Nginx website files`
-
-After the script has successfully finished, browse to the Kimai application and proceed with the installation through the Kimai installation wizard.
+  -w, --webdir path        root directory path for Nginx website files
 
 Installation process
 --------------
@@ -36,3 +34,5 @@ The script will perform the following main tasks:
 5. Create MySQL user and database for Kimai
 
 You will be prompted for a root password during the MySQL installation, you must repeat the root password prior to MySQL user and database creation.
+
+After the script has successfully finished, browse to the Kimai application and proceed with the installation through the Kimai installation wizard.
