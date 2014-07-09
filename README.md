@@ -7,9 +7,10 @@ Changing the version of Kimai to install may be done by specifying the version w
 
 Usage
 --------------
-Call the script with your prefered domain as a parameter: `bash kimaiinstall <domain>`
+Call the script with your prefered domain as an argument: `bash kimaiinstall <domain>`
 
-Usage: kimaiinstall.sh [OPTIONS]... <DOMAIN NAME>
+```
+Usage: kimaiinstall.sh [OPTIONS]... <DOMAIN NAME>  
 Install Kimai and necessary supporting software.
 
   -c, --clean              remove downloaded archive after extraction
@@ -22,6 +23,7 @@ Install Kimai and necessary supporting software.
   -u, --user name          name of MySQL user to create for Kimai
   -v, --version            output version information and exit
   -w, --webdir path        root directory path for Nginx website files
+```
 
 Installation process
 --------------
