@@ -1,19 +1,14 @@
 #!/bin/bash
 
-# General settings
-DOMAIN=$1
+# Defaults
+CLEAN_ARCHIVE="no"
 KIMAI_VERSION="0.9.3-rc.1"
 WEB_DIR="/var/www"
-
-# MySQL settings
 DATABASE="kimai"
 MYSQL_USER="kimai"
 MYSQL_PASS_LENGTH=15
-
-# Nginx settings
-WORK_RLIMIT=1024
-WORK_PROC=$( nproc )
-let WORK_CONN=${WORK_RLIMIT}/${WORK_PROC}
+NGINX_RLIMIT=1024
+NGINX_NPROC=$( nproc )
 
 # Applications to install
 APP_LIST=( curl nginx php5-fpm php-apc mysql-server php5-mysqlnd )
@@ -33,10 +28,115 @@ function check_error_exit {
         exit 1
     fi
 }
+function echo_version {
+    echo "\
+kimaiinstall 1.1.0
+License GPLv2: GNU GPL version 2 <http://gnu.org/licenses/gpl.html>.
+This is free software: you are free to change and redistribute it.
+There is NO WARRANTY, to the extent permitted by law.
 
-# Make sure domain was given
+Written by Tobias Logren Dély"
+}
+function echo_help {
+echo "\
+Usage: $0 [OPTIONS]... <DOMAIN NAME>
+Install Kimai and necessary supporting software.
+
+  -c, --clean              remove downloaded archive after extraction
+  -d, --database name      name of MySQL database to create
+  -f, --fd-limit N         allow N file descriptors between all Nginx workers
+  -h, --help               display this help and exit
+  -k, --kimai version      version of Kimai to install
+  -n, --nworkers N         allow N worker processes to be used by Nginx
+  -p, --passlength K       generate password K characters long for MySQL user
+  -u, --user name          name of MySQL user to create for Kimai
+  -v, --version            output version information and exit
+  -w, --webdir path        root directory path for Nginx website files
+
+Report kimaiinstall bugs to https://github.com/tdely/kimaiinstall/issues
+For complete documentation, see: https://github.com/tdely/kimaiinstall"
+}
+
+# Parse arguments
+while :
+do
+    case "$1" in
+      -c | --clean )
+          CLEAN_ARCHIVE="yes"
+          shift ;;
+      -d | --database )
+          [[ $2 =~ ^[A-Za-z0-9_-]+$ ]] \
+            || { echo "Error: -d, --database may only contain alphanumeric "\
+                      "characters and '-', '_'"; exit 1; }
+          DATABASE="$2"
+          shift 2 ;;
+      -f | --fd-limit )
+          [[ $2 =~ ^[0-9]+$ ]] \
+            || { echo "Error: -f, --fd-limit must be an integer"; exit 1; }
+          NGINX_RLIMIT="$2"
+          shift 2 ;;
+      -h | --help )
+          echo_help
+          exit 0 ;;
+      -k | --kimai)
+          [[ $2 =~ ^[A-Za-z0-9.-_]+$ ]] \
+            || { echo "Error: -k, --kimai may only contain alphanumeric "\
+                      "characters and '.', '-', '_'"; exit 1; }
+          KIMAI_VERSION="$2"
+          shift 2 ;;
+      -n | --nworkers)
+          [[ $2 =~ ^[0-9]+$ ]] \
+            || { echo "Error: -n, --nworkers must be an integer"; exit 1; }
+          NGINX_NPROC="$2"
+          shift 2 ;;
+      -p | --passlength)
+          [[ $2 =~ ^[0-9]+$ ]] \
+            || { echo "Error: -p, --passlength must be an integer"; exit 1; }
+          MYSQL_PASS_LENGTH="$2"
+          shift 2 ;;
+      -u | --user)
+          [[ $2 =~ ^[a-z]+$ ]] \
+            || { echo "Error: -u, --user may only contain lowercase letters";\
+                 exit 1; }
+          MYSQL_USER="$2"
+          shift 2 ;;
+      -v | --version)
+          echo_version
+          exit 0 ;;
+      -w | --webdir)
+          [[ $2 =~ ^/([A-Za-z0-9._-]|/)+$ ]] \
+            || { echo "Error: -w, --webdir must be an absulute path and may"\
+                      "only contain alphanumeric characters and '.', '-', '_'"
+                 exit 1; }
+          WEB_DIR="$2"
+          shift 2 ;;
+      --)
+          shift
+          break ;;
+      -*)
+          echo "Error: Unknown option: $1" >&2
+          exit 1 ;;
+      *)
+          break ;;
+    esac
+done
+
+
+# Must be run as root
+if [ $EUID != 0 ]; then
+    echo "Error: must be run as root"
+    exit 1
+fi
+
+DOMAIN=$1
+# Make sure domain name was given
 if [ -z "${DOMAIN}" ]; then
-    echo "You must specify a domain for Kimai"
+    echo "Error: domain name not given"
+    exit 1
+fi
+# Domain must be valid
+if ! [[ ${DOMAIN} =~ ^([a-z0-9]+)([a-z0-9.-]+)([a-z0-9]+)$ ]]; then
+    echo >&2 "Error: domain name must be lowercase and of valid format"
     exit 1
 fi
 
@@ -49,7 +149,7 @@ echo_success
 # Update APT
 echo "Updating APT.."
 apt-get update \
-  || { echo -e >&2 "apt-get \e[31mfailed\e[0m to update"; exit 1; }
+  || { echo -e >&2 "Error: apt-get \e[31mfailed\e[0m to update"; exit 1; }
 
 # Install applications
 echo "Installing required applications.."
@@ -91,10 +191,13 @@ error=$( tar -xzf "/tmp/kimai-v${KIMAI_VERSION}.tar.gz" -C "${WEB_DIR}" 2>&1 ) \
 check_error_exit "${error}"
 echo_success
 
+# Construct the full path to Kimai
+kimai_path="${WEB_DIR}/kimai-${KIMAI_VERSION}"
+
 # Set ownership
 status_message "Setting ownership of Kimai"
 error=$( chown -R "www-data:www-data" \
-           "/var/www/kimai-${KIMAI_VERSION}" 2>&1 ) \
+           "${kimai_path}" 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
 echo_success
@@ -105,32 +208,35 @@ error=$( find "/var/www/kimai-${KIMAI_VERSION}" \
            -type d -exec chmod 0550 {} \; 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
-error=$( find "/var/www/kimai-${KIMAI_VERSION}" \
+error=$( find "${kimai_path}" \
            -type f -exec chmod 0440 {} \; 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
-error=$( chmod 0770 "/var/www/kimai-${KIMAI_VERSION}/core/temporary" 2>&1 ) \
+error=$( chmod 0770 "${kimai_path}/core/temporary" 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
-error=$( chmod 0660 "/var/www/kimai-${KIMAI_VERSION}/core/temporary/logfile.txt" 2>&1 ) \
+error=$( chmod 0660 "${kimai_path}/core/temporary/logfile.txt" 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
-error=$( chmod 0770 "/var/www/kimai-${KIMAI_VERSION}/core/includes" 2>&1 ) \
+error=$( chmod 0770 "${kimai_path}/core/includes" 2>&1 ) \
   || echo_failure
 check_error_exit "${error}"
 echo_success
+
+
+let NGINX_WCONN=${NGINX_RLIMIT}/${NGINX_NPROC}
 
 # Configure Nginx
 status_message "Writing configuration to /etc/nginx.conf"
 error=$(( echo "\
 user                        www-data;
-worker_processes            ${WORK_PROC};
+worker_processes            ${NGINX_NPROC};
 worker_priority             15;
-worker_rlimit_nofile        ${WORK_RLIMIT};
+worker_rlimit_nofile        ${NGINX_RLIMIT};
 pid                         /var/run/nginx.pid;
 
 events {
-  worker_connections        ${WORK_CONN};
+  worker_connections        ${NGINX_WCONN};
   accept_mutex              on;
   multi_accept              off;
 }
@@ -294,11 +400,13 @@ check_error_exit "${error}"
 echo_success
 
 # Remove archive
-status_message "Removing archive"
-error=$( rm "/tmp/kimai-v${KIMAI_VERSION}.tar.gz" 2>&1 ) \
-  || echo_failure
-check_error_exit "${error}"
-echo_success
+if [ ${CLEAN_ARCHIVE} == "yes" ]; then
+  status_message "Removing archive"
+  error=$( rm "/tmp/kimai-v${KIMAI_VERSION}.tar.gz" 2>&1 ) \
+    || echo_failure
+  check_error_exit "${error}"
+  echo_success
+fi
 
 # Last words
 echo -e "
